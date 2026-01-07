@@ -1,116 +1,120 @@
-<p align="center">
-  <img src="assets/header.png" alt="Dev Browser - Browser automation for Claude Code" width="100%">
-</p>
+# Dev Browser 中文使用教程
 
-A browser automation plugin for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) that lets Claude control your browser to test and verify your work as you develop.
+Dev Browser 是 Claude Code 的一个“眼睛”和“手”，让 AI 能够像开发者一样控制浏览器：查看页面、点击按钮、测试流程等。
 
-**Key features:**
+它有两种工作模式，根据你的需求选择：
 
-- **Persistent pages** - Navigate once, interact across multiple scripts
-- **Flexible execution** - Full scripts when possible, step-by-step when exploring
-- **LLM-friendly DOM snapshots** - Structured page inspection optimized for AI
+1.  **扩展模式 (Extension Mode)**: 连接到你**当前打开**的 Chrome 浏览器。AI 可以看到你看到的页面，使用你的登录状态。
+2.  **独立模式 (Headless/Standalone Mode)**: AI 自动下载并启动一个独立的 Chromium 浏览器。干净环境，适合自动化测试。
 
-## Prerequisites
+---
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed
-- [Node.js](https://nodejs.org) (v18 or later) with npm
+## 🚀 快速开始（我只想用扩展连接我的 Chrome）
 
-## Installation
+这是最常用的模式。
 
-### Claude Code
+### 第一步：准备服务端
 
-```
+服务端（Relay Server）是连接 Claude 和浏览器的桥梁。
+
+1.  打开终端，进入服务端目录：
+    ```bash
+    cd skills/dev-browser
+    ```
+2.  安装依赖（如果提示下载 Chromium 且你不想下载，可忽略，只需确保依赖安装完成）：
+    ```bash
+    npm install
+    ```
+3.  **启动中继服务**（这一步至关重要，不要关闭终端）：
+    ```bash
+    npm run start-extension
+    ```
+    > **注意**: 这里使用 `start-extension` 而不是 `start-server`，因为它只启动连接中继，不需要检查或启动 Playwright 浏览器。
+
+### 第二步：安装并配置 Chrome 插件
+
+1.  **下载/构建插件**:
+    如果你下载的是源码，需要构建插件：
+
+    ```bash
+    cd extension
+    npm install
+    npm run build
+    ```
+
+    （构建完成后，生成的文件在 `extension/.output/chrome-mv3`）
+
+2.  **加载到 Chrome**:
+    - 打开 Chrome 浏览器，输入 `chrome://extensions/`。
+    - 打开右上角的 **"开发者模式 (Developer mode)"**。
+    - 点击 **"加载已解压的扩展程序 (Load unpacked)"**。
+    - 选择 `extension/.output/chrome-mv3` 文件夹。
+
+3.  **连接**:
+    - 点击浏览器工具栏的 Dev Browser 图标。
+    - 将开关切换到 **"Active"**。
+    - 状态应显示为 **"Connected to relay"**。
+
+### 第三步：连接 Claude
+
+在 Claude Code 中运行：
+
+```bash
 /plugin marketplace add sawyerhood/dev-browser
 /plugin install dev-browser@sawyerhood/dev-browser
 ```
 
-Restart Claude Code after installation.
+然后你就可以说：
 
-### Amp / Codex
+> "Connect to my browser and go to localhost:3000"
+> (连接到我的浏览器并打开 localhost:3000)
 
-Copy the skill to your skills directory:
+---
+
+## 🛠️ 独立模式（自动化测试用）
+
+如果你希望 Claude 在后台自己跑测试，不干扰你的工作：
+
+1.  进入目录：`cd skills/dev-browser`
+2.  启动服务：`npm run start-server`
+    - 这个命令会自动检查 Playwright 环境。如果没有，它会自动下载 Chromium。
+    - 它会启动一个包含完整浏览器控制逻辑的服务器。
+
+---
+
+## ❓ 常见问题 FAQ
+
+### Q1: 为什么 `npm install` 总是要下载 Chromium？
+
+Dev Browser 默认依赖 Playwright 来实现浏览器控制。Playwright 为了保证稳定性，会下载一个特定版本的 Chromium。
+如果你**只使用扩展模式**，可以通过以下方式跳过下载：
 
 ```bash
-# For Amp: ~/.claude/skills | For Codex: ~/.codex/skills
-SKILLS_DIR=~/.claude/skills  # or ~/.codex/skills
-
-mkdir -p $SKILLS_DIR
-git clone https://github.com/sawyerhood/dev-browser /tmp/dev-browser-skill
-cp -r /tmp/dev-browser-skill/skills/dev-browser $SKILLS_DIR/dev-browser
-rm -rf /tmp/dev-browser-skill
+# 在 skills/dev-browser 目录下
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 npm install
 ```
 
-**Amp only:** Start the server manually before use:
+### Q2: 扩展一直显示 "Connecting..."
+
+这说明扩展程序找不到本地的中继服务器。
+
+1.  检查你是否运行了 `npm run start-extension` (或 `start-server`)。
+2.  检查终端是否有报错。
+3.  默认端口是 `9222`，确保没有被占用。
+
+### Q3: `npm run start-server` 报错说 "Missing script: start-server"
+
+你可能在项目的**根目录**下运行了命令。
+请先进入子目录：
 
 ```bash
-cd ~/.claude/skills/dev-browser && npm install && npm run start-server
+cd skills/dev-browser
 ```
 
-### Chrome Extension (Optional)
+然后再运行命令。
 
-The Chrome extension allows Dev Browser to control your existing Chrome browser instead of launching a separate Chromium instance. This gives you access to your logged-in sessions, bookmarks, and extensions.
+### Q4: Claude 总是尝试启动新浏览器，而不是用我的？
 
-**Installation:**
+确保你在 Prompt 中明确指示，或者确保扩展已连接。通常 Claude 会优先检查是否有活跃的连接。你可以明确说：
 
-1. Download `extension.zip` from the [latest release](https://github.com/sawyerhood/dev-browser/releases/latest)
-2. Unzip the file to a permanent location (e.g., `~/.dev-browser-extension`)
-3. Open Chrome and go to `chrome://extensions`
-4. Enable "Developer mode" (toggle in top right)
-5. Click "Load unpacked" and select the unzipped extension folder
-
-**Using the extension:**
-
-1. Click the Dev Browser extension icon in Chrome's toolbar
-2. Toggle it to "Active" - this enables browser control
-3. Ask Claude to connect to your browser (e.g., "connect to my Chrome" or "use the extension")
-
-When active, Claude can control your existing Chrome tabs with all your logged-in sessions, cookies, and extensions intact.
-
-## Permissions
-
-To skip permission prompts, add to `~/.claude/settings.json`:
-
-```json
-{
-  "permissions": {
-    "allow": ["Skill(dev-browser:dev-browser)", "Bash(npx tsx:*)"]
-  }
-}
-```
-
-Or run with `claude --dangerously-skip-permissions` (skips all prompts).
-
-## Usage
-
-Just ask Claude to interact with your browser:
-
-> "Open localhost:3000 and verify the signup flow works"
-
-> "Go to the settings page and figure out why the save button isn't working"
-
-## Benchmarks
-
-| Method                  | Time    | Cost  | Turns | Success |
-| ----------------------- | ------- | ----- | ----- | ------- |
-| **Dev Browser**         | 3m 53s  | $0.88 | 29    | 100%    |
-| Playwright MCP          | 4m 31s  | $1.45 | 51    | 100%    |
-| Playwright Skill        | 8m 07s  | $1.45 | 38    | 67%     |
-| Claude Chrome Extension | 12m 54s | $2.81 | 80    | 100%    |
-
-_See [dev-browser-eval](https://github.com/SawyerHood/dev-browser-eval) for methodology._
-
-### How It's Different
-
-| Approach                                                         | How It Works                                      | Tradeoff                                               |
-| ---------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------ |
-| [Playwright MCP](https://github.com/microsoft/playwright-mcp)    | Observe-think-act loop with individual tool calls | Simple but slow; each action is a separate round-trip  |
-| [Playwright Skill](https://github.com/lackeyjb/playwright-skill) | Full scripts that run end-to-end                  | Fast but fragile; scripts start fresh every time       |
-| **Dev Browser**                                                  | Stateful server + agentic script execution        | Best of both: persistent state with flexible execution |
-
-## License
-
-MIT
-
-## Author
-
-[Sawyer Hood](https://github.com/sawyerhood)
+> "Use the connected extension to..." (使用已连接的扩展来...)
